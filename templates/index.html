@@ -1,31 +1,49 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>{{ poll.name }}</title>
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <nav>
-                <ul class="nav nav-pills pull-right">
-                    <li role="presentation" class="active"><a href="index.html">Home</a></li>
-                    <li role="presentation"><a href="vote.html">Vote</a></li>
-                    <li role="presentation"><a href="results.html">Results</a></li>
-                </ul>
-            </nav>
-            <h1 class="text-muted">Sample Poll Application</h1>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>{{option_a}} vs {{option_b}}!</title>
+    <base href="/index.html">
+    <meta name = "viewport" content = "width=device-width, initial-scale = 1.0">
+    <meta name="keywords" content="docker-compose, docker, stack">
+    <meta name="author" content="Tutum dev team">
+    <link rel='stylesheet' href="{{ url_for('static',filename='stylesheets/style.css') }}" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+  </head>
+  <body>
+    <div id="content-container">
+      <div id="content-container-center">
+        <h3>{{option_a}} vs {{option_b}}!</h3>
+        <form id="choice" name='form' method="POST" action="/">
+          <button id="a" type="submit" name="vote" class="a" value="a">{{option_a}}</button>
+          <button id="b" type="submit" name="vote" class="b" value="b">{{option_b}}</button>
+        </form>
+        <div id="tip">
+          (Tip: you can change your vote)
         </div>
-        <div class="jumbotron">
-            <h2>{{ poll.question }}</h2>
-            <p class="lead">Vote your option and see results.</p>
-            <a class="btn btn-success" href="vote.html" role="button">Vote</a>
-            <a class="btn btn-success" href="results.html" role="button">Results</a>
+        <div id="hostname">
+          Processed by container ID {{hostname}}
         </div>
-        <footer class="footer">
-            <p> Served by {{hostname}}</p>
-            <p> &copy; NoverIT 2017</p>
-        </footer>
+      </div>
     </div>
-</body>
+    <script src="http://code.jquery.com/jquery-latest.min.js" type="text/javascript"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.js"></script>
+
+    {% if vote %}
+    <script>
+      var vote = "{{vote}}";
+
+      if(vote == "a"){
+        $(".a").prop('disabled', true);
+        $(".a").html('{{option_a}} <i class="fa fa-check-circle"></i>');
+        $(".b").css('opacity','0.5');
+      }
+      if(vote == "b"){
+        $(".b").prop('disabled', true);
+        $(".b").html('{{option_b}} <i class="fa fa-check-circle"></i>');
+        $(".a").css('opacity','0.5');
+      }
+    </script>
+    {% endif %}
+  </body>
 </html>

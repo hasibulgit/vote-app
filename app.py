@@ -1,131 +1,51 @@
+from flask import Flask, render_template, request, make_response, g
+from redis import Redis
 import os
+import socket
 import random
 import json
-import socket
+import logging
 
-from datetime import datetime
-from flask import Flask, request, make_response, render_template
-from flask_sqlalchemy import SQLAlchemy
+option_a = os.getenv('OPTION_A', "Cats")
+option_b = os.getenv('OPTION_B', "Dogs")
+hostname = socket.gethostname()
 
 app = Flask(__name__)
-basedir = os.path.abspath(os.path.dirname(__file__))
-dbhost  = os.environ.get('DB_HOST', '')
-dbport  = os.environ.get('DB_PORT', '')
-dbname  = os.environ.get('DB_NAME', '')
-dbuser  = os.environ.get('DB_USER', '')
-dbpass  = os.environ.get('DB_PASS', '')
-dbtype  = os.environ.get('DB_TYPE', '')
 
-if dbtype == 'mysql':
-   dburi  = dbtype + '://' + dbuser + ':' + dbpass + '@' + dbhost + ':' + dbport + '/' + dbname
-elif dbtype == 'postgresql':
-   dburi  = dbtype + '://' + dbuser + ':' + dbpass + '@' + dbhost + ':' + dbport + '/' + dbname
-else:
-   dburi = 'sqlite:///' + os.path.join(basedir, 'data/app.db')
+gunicorn_error_logger = logging.getLogger('gunicorn.error')
+app.logger.handlers.extend(gunicorn_error_logger.handlers)
+app.logger.setLevel(logging.INFO)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = dburi
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ECHO'] = False
+def get_redis():
+    if not hasattr(g, 'redis'):
+        g.redis = Redis(host="redis", db=0, socket_timeout=5)
+    return g.redis
 
-db = SQLAlchemy(app)
+@app.route("/", methods=['POST','GET'])
+def hello():
+    voter_id = request.cookies.get('voter_id')
+    if not voter_id:
+        voter_id = hex(random.getrandbits(64))[2:-1]
 
-class Poll(db.Model):
-  id       = db.Column(db.Integer, primary_key=True)
-  name     = db.Column(db.String(30), unique=True)
-  question = db.Column(db.String(90))
-  stamp    = db.Column(db.DateTime)
-  options  = db.relationship('Option', backref='option', lazy='dynamic')
-
-  def __init__(self, name, question, stamp=None):
-      self.name  = name
-      self.question = question
-      if stamp is None:
-         stamp = datetime.utcnow()
-      self.stamp = stamp
-
-class Option(db.Model):
-  id      = db.Column(db.Integer, primary_key=True)
-  text    = db.Column(db.String(30))
-  poll_id = db.Column(db.Integer, db.ForeignKey('poll.id'))
-  poll    = db.relationship('Poll', backref=db.backref('poll', lazy='dynamic'))
-  votes   = db.Column(db.Integer)
-
-  def __init__(self, text, poll, votes):
-      self.text = text
-      self.poll = poll
-      self.votes = votes
-
-@app.route('/')
-
-@app.route('/index.html')
-def index():
-    return render_template('index.html', hostname=hostname, poll=poll)
-
-@app.route('/vote.html', methods=['POST','GET'])
-def vote():
-    has_voted = False
-    vote_stamp = request.cookies.get('vote_stamp')
+    vote = None
 
     if request.method == 'POST':
-        has_voted = True
+        redis = get_redis()
         vote = request.form['vote']
-        if vote_stamp:
-           print "This client has already has voted! His vote stamp is : " + vote_stamp
-        else:
-           print "This client has not voted yet!"
-        voted_option = Option.query.filter_by(poll_id=poll.id,id=vote).first() 
-        voted_option.votes += 1
-        db.session.commit()
-    
+        app.logger.info('Received vote for %s', vote)
+        data = json.dumps({'voter_id': voter_id, 'vote': vote})
+        redis.rpush('votes', data)
 
-
-
-    # if request.method == 'GET':
-    options = Option.query.filter_by(poll_id=poll.id).all()        
-    resp = make_response(render_template('vote.html', hostname=hostname, poll=poll, options=options))
-    
-    if has_voted:
-       vote_stamp = hex(random.getrandbits(64))[2:-1]
-       print "Set coookie for voted"
-       resp.set_cookie('vote_stamp', vote_stamp)
-    
+    resp = make_response(render_template(
+        'index.html',
+        option_a=option_a,
+        option_b=option_b,
+        hostname=hostname,
+        vote=vote,
+    ))
+    resp.set_cookie('voter_id', voter_id)
     return resp
 
-@app.route('/results.html')
-def results():
-    results = Option.query.filter_by(poll_id=poll.id).all()
-    return render_template('results.html', hostname=hostname, poll=poll, results=results)
 
-if __name__ == '__main__':
-    
-    db.create_all()
-    db.session.commit()
-    hostname = socket.gethostname()
-         
-    print "Check if a poll already exists into db"
-    # TODO check the latest one filtered by timestamp
-    poll = Poll.query.first()
-    
-    if poll:
-       print "Restart the poll"
-       poll.stamp = datetime.utcnow()
-       db.session.commit()
-    
-    else:
-       print "Load seed data from file"
-       try: 
-           with open(os.path.join(basedir, 'seeds/seed_data.json')) as file:
-               seed_data = json.load(file)
-               print "Start a new poll"
-               poll = Poll(seed_data['poll'], seed_data['question'])
-               db.session.add(poll)
-               for i in seed_data['options']:
-                   option = Option(i, poll, 0)
-                   db.session.add(option)
-               db.session.commit()
-       except:
-          print "Cannot load seed data from file"
-          poll = Poll("", "")
-    
-    app.run(host='0.0.0.0', port=5000, debug=False)
-
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=80, debug=True, threaded=True)

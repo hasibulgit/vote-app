@@ -1,34 +1,24 @@
 # Using official python runtime base image
-FROM python:2.7
+FROM python:3.9-slim
 
-LABEL Version 1.0
-
-MAINTAINER kalise <https://github.com/kalise/>
-
-# By default, the app uses an internal sqlite db
-# Use env variable to force an external SQL engine, e.g. MySQL
-# ENV DB_TYPE "mysql"
-# ENV DB_HOST "localhost"
-# ENV DB_PORT "3306"
-# ENV DB_NAME "votedb"
-# ENV DB_USER "user"
-# ENV DB_PASS "password"
+# add curl for healthcheck
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set the application directory
 WORKDIR /app
 
-# Install requirements.txt
-ADD requirements.txt /app/requirements.txt
+# Install our requirements.txt
+COPY requirements.txt /app/requirements.txt
 RUN pip install -r requirements.txt
 
-# Copy code from the current folder to /app inside the container
-ADD . /app
+# Copy our code from the current folder to /app inside the container
+COPY . .
 
-# Mount external volumes for logs and data
-VOLUME ["/app/data", "/app/seeds", "/app/logs"]
+# Make port 80 available for links and/or publish
+EXPOSE 80
 
-# Expose the port server listen to
-EXPOSE 5000
-
-# Define command to be run when launching the container
-CMD ["python", "app.py"]
+# Define our command to be run when launching the container
+CMD ["gunicorn", "app:app", "-b", "0.0.0.0:80", "--log-file", "-", "--access-logfile", "-", "--workers", "4", "--keep-alive", "0"]
