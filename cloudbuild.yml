@@ -1,0 +1,33 @@
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/gcp-cert-322415/cloud-run-source-deploy/my-app'
+      - '.'
+
+  # Step 2: Push the Docker image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/gcp-cert-322415/cloud-run-source-deploy/my-app'
+
+  # Optional Step 3: Deploy the Docker image to a Google Cloud Run service
+  # Uncomment the following lines if you want to deploy the image to Cloud Run
+  # - name: 'gcr.io/cloud-builders/gcloud'
+  #   args:
+  #     - 'run'
+  #     - 'deploy'
+  #     - 'my-app'
+  #     - '--image'
+  #     - 'us-central1-docker.pkg.dev/gcp-cert-322415/cloud-run-source-deploy/my-app'
+  #     - '--platform'
+  #     - 'managed'
+  #     - '--region'
+  #     - 'us-central1'
+
+images:
+  - 'us-central1-docker.pkg.dev/gcp-cert-322415/cloud-run-source-deploy/my-app'
+
+
