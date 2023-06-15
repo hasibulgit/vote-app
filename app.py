@@ -77,6 +77,9 @@ def vote():
         voted_option.votes += 1
         db.session.commit()
     
+
+
+
     # if request.method == 'GET':
     options = Option.query.filter_by(poll_id=poll.id).all()        
     resp = make_response(render_template('vote.html', hostname=hostname, poll=poll, options=options))
